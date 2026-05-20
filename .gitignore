@@ -1,0 +1,12 @@
+.foundation_model_triage_env/
+.singlecell_base_bakeoff_env/
+.stage1_bakeoff_env/
+public_models/
+test_results/
+data/
+test_data/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
