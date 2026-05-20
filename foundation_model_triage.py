@@ -923,6 +923,13 @@ def run_bakeoff(args):
         if emb_path.exists() and not args.force:
             print(f"  Loading cached embeddings from {emb_path}")
             embeddings = np.load(emb_path)
+            if embeddings.ndim != 2 or embeddings.shape[0] != adata.n_obs:
+                print(
+                    f"  Cached embeddings have shape {embeddings.shape}, but "
+                    f"current eval set has {adata.n_obs} cells; recomputing."
+                )
+                embeddings = extractor(adata.copy())
+                np.save(emb_path, embeddings)
         else:
             embeddings = extractor(adata.copy())
             np.save(emb_path, embeddings)
