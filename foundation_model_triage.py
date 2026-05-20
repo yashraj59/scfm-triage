@@ -18,6 +18,7 @@ Three evaluations:
 Usage:
     python foundation_model_triage.py \\
         --adata /path/to/eval_set.h5ad \\
+        --qc-done \\
         --cell-type-col cell_type \\
         --time-col time_point \\
         --focal-labels iPSC,partial_reprog \\
@@ -122,7 +123,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--setup-only", action="store_true",
                    help="Create/update the virtualenv, then exit")
     p.add_argument("--n-cells", type=int, default=100_000,
-                   help="Maximum cells to evaluate after QC; larger datasets are stratified-subsampled")
+                   help="Maximum cells to evaluate after optional QC; larger datasets are stratified-subsampled")
+    qc_group = p.add_mutually_exclusive_group(required=True)
+    qc_group.add_argument("--qc-done", action="store_true",
+                          help="Input AnnData is already QC-filtered; skip built-in QC filters")
+    qc_group.add_argument("--run-qc", action="store_true",
+                          help="Run built-in basic QC filters before evaluation")
     p.add_argument("--cell-type-col", default="cell_type")
     p.add_argument("--time-col", default="time_point")
     p.add_argument("--gene-col", default="feature_name")
@@ -290,6 +296,7 @@ def prepare_eval_set(
     n_cells: int = 100_000,
     cell_type_col: str = "cell_type",
     time_col: Optional[str] = "time_point",
+    qc_done: bool = False,
     min_genes: int = 500,
     max_mt_pct: float = 20.0,
     seed: int = 42,
@@ -307,15 +314,17 @@ def prepare_eval_set(
     adata = sc.read_h5ad(adata_path)
     print(f"  Raw: {adata.n_obs} cells x {adata.n_vars} genes")
 
-    # Standard QC
-    sc.pp.filter_cells(adata, min_genes=min_genes)
-    sc.pp.filter_genes(adata, min_cells=10)
-    adata.var["mt"] = adata.var_names.str.startswith(("MT-", "mt-"))
-    sc.pp.calculate_qc_metrics(
-        adata, qc_vars=["mt"], inplace=True, log1p=False, percent_top=None
-    )
-    adata = adata[adata.obs["pct_counts_mt"] < max_mt_pct].copy()
-    print(f"  After QC: {adata.n_obs} cells")
+    if qc_done:
+        print("  QC: skipped (--qc-done)")
+    else:
+        sc.pp.filter_cells(adata, min_genes=min_genes)
+        sc.pp.filter_genes(adata, min_cells=10)
+        adata.var["mt"] = adata.var_names.str.startswith(("MT-", "mt-"))
+        sc.pp.calculate_qc_metrics(
+            adata, qc_vars=["mt"], inplace=True, log1p=False, percent_top=None
+        )
+        adata = adata[adata.obs["pct_counts_mt"] < max_mt_pct].copy()
+        print(f"  After QC: {adata.n_obs} cells")
 
     # Stratified subsample by cell type to keep classes balanced
     if adata.n_obs > n_cells:
@@ -876,6 +885,7 @@ def run_bakeoff(args):
         n_cells=args.n_cells,
         cell_type_col=args.cell_type_col,
         time_col=args.time_col,
+        qc_done=args.qc_done,
         seed=args.seed,
     )
     adata.write_h5ad(output_dir / "eval_set.h5ad")
@@ -919,7 +929,7 @@ def run_bakeoff(args):
         if embeddings.ndim != 2 or embeddings.shape[0] != adata.n_obs:
             raise ValueError(
                 f"{name} embeddings must have shape (n_cells, n_features) with "
-                f"{adata.n_obs} rows after QC; got {embeddings.shape}."
+                f"{adata.n_obs} rows after filtering/subsampling; got {embeddings.shape}."
             )
 
         print(f"  Evaluating {name}...")

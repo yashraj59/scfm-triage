@@ -24,6 +24,7 @@ reprogramming data, but any two labels from your cell type column can be used.
 ```bash
 python foundation_model_triage.py \
   --adata /path/to/your_data.h5ad \
+  --qc-done \
   --cell-type-col cell_type \
   --time-col time_point \
   --output triage_results
@@ -34,6 +35,7 @@ For iPSC reprogramming data:
 ```bash
 python foundation_model_triage.py \
   --adata /path/to/your_data.h5ad \
+  --qc-done \
   --cell-type-col cell_type \
   --time-col time_point \
   --focal-labels iPSC,partial_reprog \
@@ -52,12 +54,15 @@ For another dataset, change the focal labels:
 Required:
 
 - `--adata`: path to an `.h5ad` AnnData file.
+- One QC choice:
+  - `--qc-done`: your AnnData is already QC-filtered.
+  - `--run-qc`: run the script's basic QC filters before evaluation.
 - `--cell-type-col`: column in `adata.obs` with clear cell type labels.
 - `--time-col`: column in `adata.obs` with time, stage, or ordering labels.
 
 Useful optional arguments:
 
-- `--n-cells`: maximum number of cells to evaluate after QC.
+- `--n-cells`: maximum number of cells to evaluate after the selected QC behavior.
 - `--focal-labels`: two comma-separated labels for cluster separation.
 - `--output`: output directory.
 - `--model-cache`: directory for downloaded public model assets.
@@ -66,8 +71,8 @@ Useful optional arguments:
 ## What `--n-cells` Means
 
 `--n-cells` is a runtime and memory cap. If your dataset has more cells after
-QC, the script stratified-subsamples by `--cell-type-col`. If your dataset has
-fewer cells, it uses all available cells.
+the selected QC behavior, the script stratified-subsamples by `--cell-type-col`.
+If your dataset has fewer cells, it uses all available cells.
 
 Suggested values:
 
@@ -135,4 +140,3 @@ Use this as an empirical model selection screen, not as a final biological
 claim. A strong base model should preserve known cell type structure, recover
 known temporal structure when present, and separate biologically important
 states without supervised fine-tuning.
-
